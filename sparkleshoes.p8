@@ -4,6 +4,7 @@ __lua__
 scene = "intro"
 t=0
 high_score = 0
+level = 1
 
 function init_game()
 	sfx(7)
@@ -546,7 +547,7 @@ function update_game()
 		move()
 	end
 	if btn(1) then
-		if player.x < 127 then
+		if player.x < 119 then
 			player.x += player.speed
 		end
 		if player.sprite == 0 then
@@ -566,7 +567,7 @@ function update_game()
 		move()
 	end
 	if btn(3) then
-		if player.y < 127 then
+		if player.y < 119 then
 			player.y += player.speed
 		end
 		if player.sprite == 0 then
