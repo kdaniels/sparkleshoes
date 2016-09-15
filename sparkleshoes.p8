@@ -28,7 +28,8 @@ function init_game()
 
 	scene = "game"
 	start_time = time()
-	max_time = 60
+	lap_time = 20
+	last_time_hardened = time()
 
 	cheeses = {}
 	fires = {}
@@ -42,7 +43,7 @@ function init_game()
 	max_cats = 1
 	max_zubats = 5
 	max_cheeses = 10
-	max_sparkles = 10
+	max_sparkles = 15
 	max_coins = 5
 	max_scopes = 1
 
@@ -51,6 +52,36 @@ function init_game()
 	last_cheese = time()
 	last_sparkle = time()
 	last_coin = time()
+	
+	cat_freq = 7
+	zubat_freq = 7
+	cheese_freq = 10
+	sparkle_freq = 4
+	coin_freq = 4
+	
+	cat_prob = .914
+	zubat_prob = .900
+	cheese_prob = .930
+	sparkle_prob = .900
+	coin_prob = .930
+	
+	zubat_speed = 0.5
+end
+
+function make_game_harder()
+	sfx(9)
+	zubat_freq -= 1
+	sparkle_freq += 1
+	coin_freq += 1
+	zubat_prob -= .005
+	sparkle_prob += .005
+	coin_prob += .005
+	zubat_speed += .1
+	max_cats += 1
+	max_zubats += 1
+	max_coins -= 1
+	max_sparkles -= 1
+	last_time_hardened = time()
 end
 
 function draw_thing(thing)
@@ -85,7 +116,7 @@ end
 
 -- cheese functions
 function make_cheese()
-	if #cheeses < max_cheeses and (time() - last_cheese) > 10 and rnd(1000) > 900 then	
+	if #cheeses < max_cheeses and (time() - last_cheese) > cheese_freq and rnd() > cheese_prob then	
 		cheese = {}
 		cheese.sprite = 7
 		cheese.x = rnd(127)
@@ -116,7 +147,7 @@ end
 
 -- sparkles
 function make_sparkle()
-	if #sparkles < max_sparkles and (time() - last_sparkle) > 4 and rnd(1000) > 920 then
+	if #sparkles < max_sparkles and (time() - last_sparkle) > sparkle_freq and rnd() > sparkle_prob then
 		sparkle = {}
 		sparkle.sprite = 50
 		sparkle.x = rnd(127)
@@ -148,7 +179,7 @@ end
 
 -- coins
 function make_coin()
-	if #coins < max_coins and (time() - last_coin) > 4 and rnd(1000) > 934 then
+	if #coins < max_coins and (time() - last_coin) > coin_freq and rnd() > coin_prob then
 		coin = {}
 		coin.sprite = 8
 		coin.x = rnd(127)
@@ -173,10 +204,10 @@ end
 
 -- zubat functions
 function make_zubat()
-	if #zubats < max_zubats and (time() - last_zubat) > 9 and rnd(1000) > 900 then
+	if #zubats < max_zubats and (time() - last_zubat) > zubat_freq and rnd() > zubat_prob then
 		zubat = {}
 		zubat.sprite = 34
-		zubat.speed = 0.5
+		zubat.speed = zubat_speed
 		zubat.x = rnd(127)
 		zubat.y = rnd(110)+10
 		add(zubats, zubat)
@@ -234,7 +265,7 @@ end
 
 -- cats
 function make_cat()
-	if #cats < max_cats and (time() - last_cat) > 7 and rnd(1000) > 921 then
+	if #cats < max_cats and (time() - last_cat) > cat_freq and rnd() > cat_prob then
 		cat = {}
 		cat.sprite = 18
 		cat.speed = 0.31
@@ -435,6 +466,7 @@ function draw_end()
 		print("high score: "..high_score, 35, 104)
 	end
 	spr(52, 55, 93)
+	print("you survived "..flr(end_time - start_time).." seconds", 19, 110)
 	
 	print("press any arrow key to restart", 1, 120)
 end
@@ -480,15 +512,16 @@ function _update()
 end
 
 function update_intro()
-	if btn(0) or btn(1) or btn(2) or btn(3) then
+	if btnp(0) or btnp(1) or btnp(2) or btnp(3) then
 		init_game()
+		player.sprite = 0
 		scene = "game"
 	end
 	t += 1
 end
 
 function update_end()
-	if (time() - end_time) > 5 then
+	if (time() - end_time) > 2 then
 		if btn(0) or btn(1) or btn(2) or btn(3) then
 			if player.points > high_score then
 				high_score = player.points
@@ -579,11 +612,11 @@ function update_game()
 		player.coins -= 1
 	end
 	
-	if (time() - start_time) > max_time then
-		sfx(9)
-		end_time = time()
-		scene = "end"
-	elseif player.life < 1 then
+	if (time() - last_time_hardened) > lap_time then
+		make_game_harder()
+	end
+	
+	if player.life < 1 then
 		sfx(8)
 		end_time = time()
 		scene = "end"
@@ -764,7 +797,7 @@ __sfx__
 000600000c47008470064700447003470016700167001670000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000500000127001270082700827011270112701d2701d270252702527025270252702527025270252700000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000002457024570245702357023570235702257022570225702157021570215702157021570215702157021570215002150000000000000000000000000000000000000000000000000000000000000000000
-001000002457024570245702b5702b5702b5703457034570345703c5703c5703c5703c5703c5703c5700000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000a00000457004570045700557005570055700457004570045700557005570055700457004570045700457004570045700000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
