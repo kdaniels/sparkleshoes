@@ -6,6 +6,13 @@ t=0
 high_score = 0
 level = 1
 
+-- todo 
+-- level 3 set computers on fire
+-- make explosions that propagate
+-- make soxks enemies that might
+-- spawn more when you set them
+-- on fire
+
 function init_game()
 	sfx(7)
 	player = {}
@@ -20,10 +27,12 @@ function init_game()
 	player.cats = 0
 	player.coins = 0
 	player.sparkles = 0
+	player.beers = 0
 	player.points = 0
 	
 	cats_collected = 0
 	zubats_killed = 0
+	monsters_killed = 0
 	cheese_eaten = 0
 	scopes_crept = 0
 
@@ -39,7 +48,10 @@ function init_game()
 	sparkles = {}
 	zubats = {}
 	cats = {}
-	scopes = {} 
+	scopes = {}
+	beers = {}
+	monsters = {}
+	explosions = {}
 
 	max_cats = 1
 	max_zubats = 5
@@ -47,26 +59,44 @@ function init_game()
 	max_sparkles = 15
 	max_coins = 5
 	max_scopes = 1
+	max_beers = 0
+	max_monsters = 0
 
 	last_cat = time()
 	last_zubat = time()
 	last_cheese = time()
 	last_sparkle = time()
 	last_coin = time()
+	last_beer = time()
+	last_monster = time()
 	
 	cat_freq = 7
 	zubat_freq = 7
 	cheese_freq = 10
 	sparkle_freq = 4
 	coin_freq = 4
+	beer_freq = 5
+	monster_freq = 5
 	
 	cat_prob = .914
 	zubat_prob = .900
 	cheese_prob = .930
 	sparkle_prob = .900
 	coin_prob = .930
+	beer_prob = .920
+	monster_prob = .950
 	
 	zubat_speed = 0.5
+	monster_speed = 0.2
+end
+
+function set_level(level)
+	if level == 2 then
+		sfx(10)
+		max_beers = 10
+		max_monsters = 5
+		scene = "level2"
+	end
 end
 
 function make_game_harder()
@@ -82,6 +112,15 @@ function make_game_harder()
 	max_zubats += 1
 	max_coins -= 1
 	max_sparkles -= 1
+	
+	if level == 2 then
+		max_monsters += 2
+		monster_speed += 0.05
+		monster_prob -= .01
+		beer_prob += .005
+		sparkle_prob += .003
+	end
+	
 	last_time_hardened = time()
 end
 
@@ -115,12 +154,43 @@ function move_scope(scope)
 	end
 end
 
+-- explosions
+function make_explosion(x, y, direction)
+	explosion = {}
+	explosion.direction = direction
+	explosion.x = x
+	explosion.y = y
+	explosion.speed = 0.5
+	explosion.sprite = 53
+	add(explosions, explosion)
+	sfx(11)
+end
+function move_explosion(explosion)
+	if explosion.direction == 0 then
+		explosion.x -= explosion.speed
+	elseif explosion.direction == 1 then
+		explosion.x += explosion.speed
+	elseif explosion.direction == 2 then
+		explosion.y -= explosion.speed
+	elseif explosion.direction == 3 then
+		explosion.y += explosion.speed
+	end
+	if explosion.x > 127 or explosion.x < 0 or explosion.y < 0 or explosion.y > 127 then
+		del(explosions, explosion)
+	end
+	explosion.sprite += 1
+	if explosion.sprite == 61 then
+		del(explosions, explosion)
+	end
+end
+
+
 -- cheese functions
 function make_cheese()
 	if #cheeses < max_cheeses and (time() - last_cheese) > cheese_freq and rnd() > cheese_prob then	
 		cheese = {}
 		cheese.sprite = 7
-		cheese.x = rnd(127)
+		cheese.x = rnd(112)
 		cheese.y = rnd(110)+10
 		cheese.time = time()
 		add(cheeses, cheese)
@@ -151,7 +221,7 @@ function make_sparkle()
 	if #sparkles < max_sparkles and (time() - last_sparkle) > sparkle_freq and rnd() > sparkle_prob then
 		sparkle = {}
 		sparkle.sprite = 50
-		sparkle.x = rnd(127)
+		sparkle.x = rnd(112)
 		sparkle.y = rnd(110)+10
 		add(sparkles, sparkle)
 		last_sparkle = time()
@@ -183,7 +253,7 @@ function make_coin()
 	if #coins < max_coins and (time() - last_coin) > coin_freq and rnd() > coin_prob then
 		coin = {}
 		coin.sprite = 8
-		coin.x = rnd(127)
+		coin.x = rnd(112)
 		coin.y = rnd(110)+10
 		add(coins, coin)
 		last_coin = time()
@@ -250,6 +320,33 @@ function check_zubat(zubat)
 			end
 		end 
 	end
+	if #explosions > 0 then
+		new_exps = {}
+		for explosion in all(explosions) do
+			if is_overlapping(explosion, zubat) then
+				del(zubats, zubat)
+				zubats_killed += 1
+				scope_creep = true
+				scopes_crept += 1
+				player.points += 1
+				new_exp = {}
+				-- these have to be added
+				-- outside of the all(explosion)
+				-- loop to prevent infinite 
+				-- looping and crashing pico8
+				new_exp.x = explosion.x
+				new_exp.y = explosion.y
+				new_exp.direction = explosion.direction
+				add(new_exps, new_exp)
+				del(explosions, explosion)	
+			end
+		end
+		if #new_exps > 0 then
+			for new_exp in all(new_exps) do
+				make_explosion(new_exp.x, new_exp.y, new_exp.direction)
+			end
+		end
+	end
 	-- if you accidentally heart a zubat
 	-- it gets faster
 	if #hearts > 0 then
@@ -270,7 +367,7 @@ function make_cat()
 		cat = {}
 		cat.sprite = 18
 		cat.speed = 0.31
-		cat.x = rnd(120)
+		cat.x = rnd(112)
 		cat.y = rnd(110)+10
 		cat.facing = flr(rnd(4))
 		add(cats, cat)
@@ -335,7 +432,7 @@ function set_heart(direction)
 	add(hearts, heart)
 end
 function move_heart(heart)
-if heart.direction == 0 then
+	if heart.direction == 0 then
 		heart.x -= heart.speed
 	elseif heart.direction == 1 then
 		heart.x += heart.speed
@@ -379,6 +476,111 @@ function move_fire(fire)
 	end
 end
 
+-- beer
+function make_beer()
+	if #beers < max_beers and (time() - last_beer) > beer_freq and rnd() > beer_prob then	
+		beer = {}
+		beer.sprite = 9
+		beer.x = rnd(112)
+		beer.y = rnd(110)+10
+		beer.time = time()
+		add(beers, beer)
+		last_beer = time()
+	end
+end
+
+function check_beer(beer)
+	if is_overlapping(player,beer) then
+		del(beers, beer)
+		sfx(0)
+		player.beers += 1
+		scope_creep = true
+		scopes_crept += 1
+	end
+	if (time() - beer.time) > 10 then
+		del(beers, beer)
+	end
+end
+
+-- tentacle monsters
+function make_monster()
+	if #monsters < max_monsters and (time() - last_monster) > monster_freq and rnd() > monster_prob then
+		monster = {}
+		monster.sprite = 10
+		monster.speed = monster_speed
+		monster.x = rnd(112)
+		monster.y = rnd(110)+10
+		add(monsters, monster)
+		last_monster = time()
+	end
+end
+
+function move_monster(monster)
+	if player.x > monster.x then
+		monster.x += monster.speed
+	elseif player.x < monster.x then
+		monster.x -= monster.speed
+	end
+	if player.y > monster.y then
+		monster.y += monster.speed
+	elseif player.y < monster.y then
+		monster.y -= monster.speed
+	end
+	if monster.sprite % 2 == 0 then
+		monster.sprite += 1
+	else
+		monster.sprite -= 1
+	end
+end
+
+function check_monster(monster)
+	if is_overlapping(player,monster) then
+		player.life -= 0.1
+		sfx(3)
+	end
+	if #fires > 0 then
+		for fire in all(fires) do
+			if is_overlapping(fire,monster) then
+				sfx(1)
+				make_explosion(fire.x, fire.y, fire.direction)
+				del(fires,fire)
+				del(monsters, monster)
+				monsters_killed += 1
+				scope_creep = true
+				scopes_crept += 1
+				player.points += 5
+			end
+		end 
+	end
+	if #explosions > 0 then
+		new_exps = {}
+		for explosion in all(explosions) do
+			if is_overlapping(explosion, monster) then
+				del(monsters, monster)
+				monsters_killed += 1
+				scope_creep = true
+				scopes_crept += 1
+				player.points += 1
+				new_exp = {}
+				-- these have to be added
+				-- outside of the all(explosion)
+				-- loop to prevent infinite 
+				-- looping and crashing pico8
+				new_exp.x = explosion.x
+				new_exp.y = explosion.y
+				new_exp.direction = explosion.direction
+				add(new_exps, new_exp)
+				del(explosions, explosion)	
+			end
+		end
+		if #new_exps > 0 then
+			for new_exp in all(new_exps) do
+				make_explosion(new_exp.x, new_exp.y, new_exp.direction)
+			end
+		end
+	end
+end
+
 -- this is the player
 function move()
 	player.moving = true
@@ -396,6 +598,8 @@ function _draw()
 		draw_game()
 	elseif scene == "end" then
 		draw_end()
+	elseif scene == "level2" then
+		draw_level2()
 	end
 end
 
@@ -435,6 +639,17 @@ function draw_intro()
 	print("press any arrow key to start", 10, 120)
 end
 
+function draw_level2()
+	cls()
+	print("level 2!", 45, 60)
+	print("now you can shoot   with", 15, 75)
+	spr(2, 85, 73)
+	spr(9, 113, 73)
+	print("but watch out for", 20, 85)
+	spr(10, 92, 83)
+	print("press any arrow key to continue", 1, 120)
+end
+
 function draw_end()
 	cls()
 	
@@ -444,21 +659,24 @@ function draw_end()
 			col = 7 + j
 			t1 = t + i*4 - j*2
 			x = cos(t0)*5
-			y = 10 + j + cos(t1/50)*5
+			y = 5 + j + cos(t1/50)*5
 			pal(7,col)
 			spr(35+i, 12+i*8+x, y)
 		end
 	end
 	
-	print(cats_collected.."    collected", 10, 40)
-	spr(18, 20, 38)
-	print(zubats_killed.."    vanquished", 10, 50)
-	spr(34, 20, 48)
-	spr(7, 20, 58)
-	print(cheese_eaten.."    eaten", 10, 60)
-	spr(4, 20, 68)
-	print(scopes_crept.."    crept up on you", 10, 70)
-	
+	print(cats_collected.."    collected", 10, 30)
+	spr(18, 20, 28)
+	print(zubats_killed.."    vanquished", 10, 40)
+	spr(34, 20, 38)
+	print(cheese_eaten.."    eaten", 10, 50)
+	spr(7, 20, 48)
+	print(scopes_crept.."    crept up on you", 10, 60)
+	spr(4, 20, 58)
+	if level == 2 then
+		print(monsters_killed.."    defeated", 10, 70)
+		spr(10, 20, 68)
+	end
 	if player.points > high_score then
 		print("new high score: "..player.points.."!", 26, 85)
 		print("previous high score: "..high_score, 21, 104)
@@ -486,6 +704,9 @@ function draw_game()
 	foreach(sparkles, draw_thing)
 	foreach(coins, draw_thing)
 	foreach(scopes, draw_thing)
+	foreach(beers, draw_thing)
+	foreach(monsters, draw_thing)
+	foreach(explosions, draw_thing)
 	spr(7, 1, 1)
 	print("*", 10, 3)
 	print(player.cheeses, 15, 3)
@@ -498,6 +719,11 @@ function draw_game()
 	spr(8, 60, 1)
 	print("*", 69, 3)
 	print(player.coins, 74, 3)
+	
+	if level == 2 then
+		spr(9, 80, 1)
+		print("*"..player.beers, 89, 3)
+	end
 	spr(52, 105, 120)
 	print("*"..player.points, 113, 122)
 end
@@ -509,6 +735,8 @@ function _update()
 		update_game()
 	elseif scene == "end" then
 		update_end()
+	elseif scene == "level2" then
+		update_level2()
 	end
 end
 
@@ -528,10 +756,20 @@ function update_end()
 				high_score = player.points
 			end
 			init_game()
+			level = 1
 			scene = "game"
 		end
 	end
 	t += 1
+end
+
+function update_level2()
+	level = 2
+	if (time() - level2_time) > 2 then
+		if btn(0) or btn(1) or btn(2) or btn(3) then
+			scene = "game"
+		end
+	end
 end
 
 function update_game()
@@ -602,7 +840,17 @@ function update_game()
 	foreach(sparkles, move_sparkle)
 	foreach(scopes, move_scope)
 	
-	if btnp(5) and player.sparkles > 0 then
+	if level == 2 then
+		make_beer()
+		make_monster()
+		
+		foreach(beers, check_beer)
+		foreach(monsters, check_monster)
+		foreach(monsters, move_monster)
+		foreach(explosions, move_explosion)
+	end
+	
+	if btnp(5) and (player.sparkles > 0 or player.beers > 0) then
 		sfx(2)
 		set_fire(player.facing)
 		player.sparkles -= 1
@@ -617,6 +865,11 @@ function update_game()
 		make_game_harder()
 	end
 	
+	if (time() - start_time) > 60 and level == 1 then
+		level2_time = time()
+		set_level(2)
+	end
+	
 	if player.life < 1 then
 		sfx(8)
 		end_time = time()
@@ -624,14 +877,14 @@ function update_game()
 	end
 end
 __gfx__
-00033300000333000aa0000000aa00000000665008ee08e0028802800000a0000007650000000000000000000000000000000000000000000000000000000000
-00333330003333300a9a000000a9a000000665008eeeeeee28888888000a99000076665000000000000000000000000000000000000000000000000000000000
-0b83338b0b83338b0a99a00000a99a00006650008eeeeeee2888888800aa99900766666500000000000000000000000000000000000000000000000000000000
-0333333303333333a9989a000a9899a0066660008eeeeeee2888888809aa99aa0766666500000000000000000000000000000000000000000000000000000000
-00b636b000b636b0a98899a00a98899a055066008eeeeeee28888888999aaaa90766666500000000000000000000000000000000000000000000000000000000
-0033530000335300998889a00988889a0cc0660008eeeee00288888099aaaa990766666500000000000000000000000000000000000000000000000000000000
-30b3500030b35000098888900988888000006600008eee0000288800aaa99a990076665000000000000000000000000000000000000000000000000000000000
-03350500035050000098890000988900555555550008e00000028000aa999aa90007650000000000000000000000000000000000000000000000000000000000
+00033300000333000aa0000000aa00000000665008ee08e0028802800000a000000765000777f000002220000022200000000000000000000000000000000000
+00333330003333300a9a000000a9a000000665008eeeeeee28888888000a9900007666506777f666027772200277722000000000000000000000000000000000
+0b83338b0b83338b0a99a00000a99a00006650008eeeeeee2888888800aa9990076666656aaa9606127332201273322000000000000000000000000000000000
+0333333303333333a9989a000a9899a0066660008eeeeeee2888888809aa99aa076666656aaa9606127352221273522200000000000000000000000000000000
+00b636b000b636b0a98899a00a98899a055066008eeeeeee28888888999aaaa9076666656aaa9606122222221222222200000000000000000000000000000000
+0033530000335300998889a00988889a0cc0660008eeeee00288888099aaaa99076666656aaa9660122202021222020200000000000000000000000000000000
+30b3500030b35000098888900988888000006600008eee0000288800aaa99a99007666506aaa9600120202021220220200000000000000000000000000000000
+03350500035050000098890000988900555555550008e00000028000aa999aa90007650006666000020202022020202000000000000000000000000000000000
 00033300000333000600000006000000077777700777777000777000077777700700000707000000077777770777777007000007007770000777777707777770
 00333830003338305000060650000606700000070700000707000700070000070700000707000000070000007000000707000007070007000700000070000007
 00bb333300bb333360000b6b60000b6b700000000700000770000070070000070700000707000000070000007000000007000007700000700700000070000000
@@ -649,13 +902,13 @@ __gfx__
 30bbbb0030bbbb00c00cc00cc00cc00c700000777000007770000077077777770000000070000077070077000777777707000007000000000000000000000000
 0350500003350500c000000c00000000077777707000007770000077077777770000000007777770077770000777777707000007000000000000000000000000
 003330000033300000e00e00080080009aaaaaaa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0383330003833300000000000000000809aaaaa00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-3333bb003333bb00e020020e0000e00009aaaaa00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-6033330060333300000d000080e0c00009aaaaa00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0053bb000053bb000000d000000c0e08009aaa000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0055330000553300e020020e000e00000009a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00553bb000553bb000000000800000000009a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-050500330050503300e00e0000080080009aaa000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0383330003833300000000000000000809aaaaa00000000000090000000900008009008000040000000400000000000000000000000000000000000000000000
+3333bb003333bb00e020020e0000e00009aaaaa00009000009090900090909000909090008090800040504000004000000000000000000000000000000000000
+6033330060333300000d000080e0c00009aaaaa0000900000009000000a9a00000a9a00000a9a00000a9a0000059500000454000000000000000000000000000
+0053bb000053bb000000d000000c0e08009aaa000990990099909990999099909990999049909940459095400490940000505000000000000000000000000000
+0055330000553300e020020e000e00000009a000000900000009000000a9a00000a9a00000a9a00000a9a0000059500000454000000000000000000000000000
+00553bb000553bb000000000800000000009a0000009000009090900090909000909090008090800040504000004000000000000000000000000000000000000
+050500330050503300e00e0000080080009aaa000000000000090000000900008009008000040000000400000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -799,8 +1052,8 @@ __sfx__
 000500000127001270082700827011270112701d2701d270252702527025270252702527025270252700000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000002457024570245702357023570235702257022570225702157021570215702157021570215702157021570215002150000000000000000000000000000000000000000000000000000000000000000000
 000a00000457004570045700557005570055700457004570045700557005570055700457004570045700457004570045700000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000800000d2700d2700f2700f270112701127014270142701127011270142701427014270142702527025270272702727029270292702c2702c27029270292702c2702c2702c2702c27000000000000000000000
+000a00000a6700a670056700567001670016700160001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
