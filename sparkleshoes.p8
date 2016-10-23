@@ -6,10 +6,6 @@ t=0
 high_score = 0
 level = 1
 
--- todo why does the number of
--- sparkles go negative in 
--- level 2???
-
 function init_game()
 	sfx(7)
 	player = {}
@@ -70,7 +66,7 @@ function init_game()
 	cat_freq = 7
 	zubat_freq = 7
 	cheese_freq = 10
-	sparkle_freq = 4
+	sparkle_freq = 3
 	coin_freq = 4
 	beer_freq = 5
 	monster_freq = 5
@@ -78,13 +74,99 @@ function init_game()
 	cat_prob = .914
 	zubat_prob = .900
 	cheese_prob = .930
-	sparkle_prob = .900
+	sparkle_prob = .800
 	coin_prob = .930
 	beer_prob = .920
 	monster_prob = .950
 	
 	zubat_speed = 0.5
 	monster_speed = 0.2
+	
+	sox_monster = {}
+	sox_monster.health = 100
+	sox_monster.sprite = 64
+	sox_monster.x = 50
+	sox_monster.y = 50
+	sox_monster.velocity_x = 0.5
+	sox_monster.velocity_y = 0.5
+end
+
+function check_sox_monster()
+	-- check overlap with player
+	if is_sox_overlapping(player) then
+		player.life -= 0.1
+		sfx(6)
+	end
+	
+	-- check overlap with fire
+	for f in all(fires) do
+		if is_sox_overlapping(f) then
+			del(fires, f)
+			if sox_monster.health > 75 then
+				sfx(13)
+			elseif sox_monster.health > 50 then
+				sfx(14)
+			elseif sox_monster.health > 25 then
+				sfx(15)
+			else
+				sfx(16)
+			end
+			sox_monster.health -= 5
+		end
+	end
+	
+	-- check overlap with hearts
+	-- love also defeats the sox monster
+	for h in all(hearts) do
+		if is_sox_overlapping(h) then
+			del(hearts, h)
+			sfx(17)
+			sox_monster.health -= 5
+		end
+	end
+	
+	-- check health and change sprite
+	if sox_monster.health < 75 and sox_monster.sprite == 64 then
+		sox_monster.velocity_x += 0.25
+		sox_monster.sprite = 67
+	end
+	if sox_monster.health < 50 and sox_monster.sprite == 67 then
+		sox_monster.velocity_y += 0.25
+		sox_monster.sprite = 70
+	end
+	if sox_monster.health < 25 and sox_monster.sprite == 70 then
+		sox_monster.velocity_y += 0.25
+		sox_monster.sprite = 73
+	end
+	if sox_monster.health < 10 and sox_monster.sprite == 73 then
+		sox_monster.velocity_x += 0.25
+		sox_monster.sprite = 76
+	end
+
+	-- move the sox monster around
+	sox_monster.x += sox_monster.velocity_x
+	sox_monster.y += sox_monster.velocity_y
+	if sox_monster.x + 24 > 128 or sox_monster.x < 0 then
+		sox_monster.velocity_x *= -1
+	end
+	if sox_monster.y + 32 > 128 or sox_monster.y < 0 then
+		sox_monster.velocity_y *= -1
+	end
+
+	-- if health == 0, you win
+	-- in the future, level 4
+	if sox_monster.health <= 0 then
+		sfx(18)
+		end_time = time()
+		scene = "end"
+	end
+end
+
+function draw_sox_monster()
+	spr(sox_monster.sprite,
+					sox_monster.x,
+					sox_monster.y,
+					3, 4)
 end
 
 function set_level(level)
@@ -106,27 +188,22 @@ end
 function make_game_harder()
 	sfx(9)
 	zubat_freq -= 1
-	sparkle_freq += 1
-	coin_freq += 1
 	zubat_prob -= .005
-	sparkle_prob += .005
-	coin_prob += .005
 	zubat_speed += .1
 	max_cats += 1
-	max_zubats += 1
-	max_coins -= 1
-	max_sparkles -= 1
+	if level < 3 then
+		max_zubats += 1
+		sparkle_freq += 0.5
+		coin_freq += 1
+		sparkle_prob += .005
+		coin_prob += .005
+	end
 	
-	if level == 2 then
+	if level >= 2 then
 		max_monsters += 2
 		monster_speed += 0.05
 		monster_prob -= .01
 		beer_prob += .005
-		sparkle_prob += .003
-	end
-	
-	if level == 3 then
-		sox_monster.health += 10
 	end
 	
 	last_time_hardened = time()
@@ -142,6 +219,16 @@ function is_overlapping(a,b)
 		and a.y+8>b.y
 		and b.y+8>a.y
 end
+
+function is_sox_overlapping(a)
+	-- the sox monster is big.
+	-- there's probably a better way of doing this.
+	return sox_monster.x+24>a.x
+		and a.x+8>sox_monster.x
+		and sox_monster.y+32>a.y
+		and a.y+8>sox_monster.y
+end
+
 
 -- thanks avleen
 function make_scope()
@@ -160,7 +247,7 @@ function move_scope(scope)
 		scope.x -= scope.speed
 		scope_creep = false
 	end
-	if scope.x <= 40 then
+	if scope.x <= 60 and level == 2 and (time() - level2_time > 30) then
 		level3_time = time()
 		set_level(3)
 	end
@@ -657,11 +744,11 @@ end
 function draw_level2()
 	cls()
 	print("level 2!", 45, 60)
-	print("now you can shoot   with", 15, 75)
-	spr(2, 85, 73)
-	spr(9, 113, 73)
-	print("but watch out for", 20, 85)
-	spr(10, 92, 83)
+	print("now you can shoot   with", 10, 75)
+	spr(2, 80, 73)
+	spr(9, 108, 73)
+	print("but watch out for", 15, 85)
+	spr(10, 87, 83)
 	print("press any arrow key to continue", 1, 120)
 end
 
@@ -702,17 +789,21 @@ function draw_end()
 		spr(10, 20, 68)
 	end
 	-- level 3
-	if player.points > high_score then
-		print("new high score: "..player.points.."!", 26, 85)
-		print("previous high score: "..high_score, 21, 104)
-	else
-		print("your score: "..player.points, 35, 85)
-		print("high score: "..high_score, 35, 104)
-	end
-	spr(52, 55, 93)
-	print("you survived "..flr(end_time - start_time).." seconds", 19, 110)
+	if level >= 3 and sox_monster.health <= 0 then
+		print("you defeated the sox monster!", 10, 82)
+	end		
 	
-	print("press any arrow key to restart", 1, 120)
+	if player.points > high_score then
+		print("new high score: "..player.points.."!", 26, 90)
+		print("previous high score: "..high_score, 21, 109)
+	else
+		print("your score: "..player.points, 35, 90)
+		print("high score: "..high_score, 35, 109)
+	end
+	spr(52, 55, 98)
+	print("you survived "..flr(end_time - start_time).." seconds", 19, 115)
+	
+	print("press any arrow key to restart", 1, 122)
 end
 
 function draw_game()
@@ -745,12 +836,16 @@ function draw_game()
 	print("*", 69, 3)
 	print(player.coins, 74, 3)
 	
-	if level == 2 then
+	if level >= 2 then
 		spr(9, 80, 1)
 		print("*"..player.beers, 89, 3)
 	end
 	spr(52, 105, 120)
 	print("*"..player.points, 113, 122)
+
+	if level == 3 then
+		draw_sox_monster()
+	end
 end
 
 function _update()
@@ -804,7 +899,6 @@ function update_level3()
 	if (time() - level3_time) > 2 then
 		if btn(0) or btn(1) or btn(2) or btn(3) then
 			scene = "game"
-			level = 3
 		end
 	end
 end
@@ -877,22 +971,28 @@ function update_game()
 	foreach(sparkles, move_sparkle)
 	foreach(scopes, move_scope)
 	
-	if level == 2 then
+	if level >= 2 then
 		make_beer()
 		make_monster()
-		
+
 		foreach(beers, check_beer)
 		foreach(monsters, check_monster)
 		foreach(monsters, move_monster)
 		foreach(explosions, move_explosion)
 	end
 	
-	-- level 3 goes here
+	if level == 3 then
+		check_sox_monster()
+	end
 	
 	if btnp(5) and (player.sparkles > 0 or player.beers > 0) then
 		sfx(2)
 		set_fire(player.facing)
-		player.sparkles -= 1
+		if player.beers > 0 then
+			player.beers -= 1
+		else
+			player.sparkles -= 1
+		end
 	end
 	if btnp(4) and player.coins > 0 then
 		sfx(2)
@@ -1094,12 +1194,12 @@ __sfx__
 000800000d2700d2700f2700f270112701127014270142701127011270142701427014270142702527025270272702727029270292702c2702c27029270292702c2702c2702c2702c27000000000000000000000
 000a00000a6700a670056700567001670016700160001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000d2700d2700d2700f27010270102700d2700d27001270012700d2700d2700d2700f27010270102700c2700c27001270012700d2700d2700d2700f2701027010270092700927008270082700827008270
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000247005470054700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000247006470064700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00100000024700a4700a4700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00100000024700d4700d4700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000a000023270262702f2702e2702e2702e2700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0008000007170071700b1700b1700b17007170071700b1700b1700b17007170071700b1700b1700b1700e1700e170131701317013170131702b170131702b170131702b170131702b1702b1702b1702b1702b170
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
