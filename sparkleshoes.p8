@@ -707,6 +707,7 @@ end
 
 function draw_intro()
 	cls()
+	spr(4, 120, 120)
 	
 	for i=1,12 do
 		for j0=0,7 do
